@@ -1,0 +1,7 @@
+RewriteEngine On
+
+# ASPEK: Clean URL / SEO (A48, B115)
+# Mengalihkan semua request ke index.php?action=...
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php?action=$1 [QSA,L]

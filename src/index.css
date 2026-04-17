@@ -1,0 +1,239 @@
+@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@400;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=VT323&display=swap");
+
+@import "tailwindcss";
+
+@theme {
+  /* Dynamic Accessibility Fonts */
+  --font-game: var(--applied-font-game);
+  --font-body: var(--applied-font-body);
+  --font-pixel: var(--applied-font-pixel);
+
+  /* Retro Palette */
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-sky: var(--sky-blue);
+  --color-green: var(--soft-green);
+  --color-yellow: var(--warm-yellow);
+  --color-peach: var(--peach);
+  --color-lavender: var(--lavender);
+
+  /* Animations */
+  --animate-float: float 4s ease-in-out infinite;
+  --animate-screen-in: pixelFadeIn 0.4s steps(4) forwards;
+  --animate-press: buttonPress 0.1s steps(2) forwards;
+
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+  @keyframes pixelFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+:root {
+  --font-game-src: "Press Start 2P", cursive;
+  --font-body-src: "Outfit", "Inter", sans-serif;
+  --font-pixel-src: "VT323", monospace;
+
+  --applied-font-game: var(--font-game-src);
+  --applied-font-body: var(--font-body-src);
+  --applied-font-pixel: var(--font-pixel-src);
+
+  /* Retro CRT Themes */
+  --bg-primary: #f0f0f0;
+  --bg-secondary: #e0e0e0;
+  --text-primary: #101010;
+  --text-secondary: #404040;
+  --panel-bg: #ffffff;
+  --panel-border: #000000;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+
+  --sky-blue: #0000ff;
+  --soft-green: #00aa00;
+  --warm-yellow: #ffaa00;
+  --peach: #cc0000;
+  --lavender: #aa00ff;
+
+  --base-font-size: 16px;
+}
+
+[data-theme="dark"] {
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #0a0a0a;
+  --text-primary: #d0d0d0;
+  --text-secondary: #808080;
+  --panel-bg: #2a2a2a;
+  --panel-border: #ffffff;
+  --shadow-color: rgba(0, 0, 0, 0.6);
+
+  --sky-blue: #5555ff;
+  --soft-green: #55ff55;
+  --warm-yellow: #ffff55;
+  --peach: #ff5555;
+  --lavender: #ff55ff;
+}
+
+/* Base Styles */
+@layer base {
+  body {
+    font-family: var(--applied-font-body);
+    background-color: transparent;
+    color: var(--text-primary);
+    @apply antialiased overflow-x-hidden transition-all duration-300;
+    image-rendering: pixelated;
+  }
+
+  body::after {
+    content: "";
+    @apply fixed inset-0 pointer-events-none z-[9999] opacity-[0.03];
+    background:
+      linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+      linear-gradient(
+        90deg,
+        rgba(255, 0, 0, 0.06),
+        rgba(0, 255, 0, 0.02),
+        rgba(0, 0, 255, 0.06)
+      );
+    background-size:
+      100% 4px,
+      3px 100%;
+  }
+}
+
+/* Utilities (Tailwind v4 Way) */
+@utility pixel-box {
+  background-color: var(--panel-bg);
+  box-shadow:
+    0 -4px 0 -2px var(--panel-border),
+    0 4px 0 -2px var(--panel-border),
+    -4px 0 0 -2px var(--panel-border),
+    4px 0 0 -2px var(--panel-border),
+    0 -4px 0 0 var(--panel-border),
+    0 4px 0 0 var(--panel-border),
+    -4px 0 0 0 var(--panel-border),
+    4px 0 0 0 var(--panel-border);
+}
+
+@utility bright-bg {
+  @apply fixed inset-0 w-full h-full -z-20 object-cover;
+  background-image: url("/background.webp");
+  background-size: cover;
+  background-position: center;
+  image-rendering: pixelated;
+}
+
+@utility bright-overlay {
+  @apply fixed inset-0 w-full h-full -z-10 transition-colors duration-500 bg-primary opacity-80;
+}
+
+@utility bright-panel {
+  @apply pixel-box border-0 transition-all duration-300 p-8 m-2;
+  position: relative;
+  box-shadow:
+    0 -4px 0 -2px var(--panel-border),
+    0 4px 0 -2px var(--panel-border),
+    -4px 0 0 -2px var(--panel-border),
+    4px 0 0 -2px var(--panel-border),
+    0 -4px 0 0 var(--panel-border),
+    0 4px 0 0 var(--panel-border),
+    -4px 0 0 0 var(--panel-border),
+    4px 0 0 0 var(--panel-border),
+    8px 8px 0 0 var(--shadow-color);
+}
+
+@utility bright-card {
+  @apply pixel-box border-0 transition-all duration-300 p-6 m-2;
+  position: relative;
+  box-shadow:
+    0 -4px 0 -2px var(--panel-border),
+    0 4px 0 -2px var(--panel-border),
+    -4px 0 0 -2px var(--panel-border),
+    4px 0 0 -2px var(--panel-border),
+    0 -4px 0 0 var(--panel-border),
+    0 4px 0 0 var(--panel-border),
+    -4px 0 0 0 var(--panel-border),
+    4px 0 0 0 var(--panel-border),
+    6px 6px 0 0 var(--shadow-color);
+}
+
+@utility bright-button {
+  @apply font-game relative transition-all duration-100 p-2;
+  background-color: var(--button-color, var(--sky-blue));
+  color: white;
+  box-shadow:
+    0 -4px 0 -2px #000,
+    0 4px 0 -2px #000,
+    -4px 0 0 -2px #000,
+    4px 0 0 -2px #000,
+    0 -4px 0 0 #000,
+    0 4px 0 0 #000,
+    -4px 0 0 0 #000,
+    4px 0 0 0 #000,
+    inset 0 -4px 0 0 rgba(0, 0, 0, 0.3),
+    inset 0 4px 0 0 rgba(255, 255, 255, 0.4),
+    4px 4px 0 0 var(--shadow-color);
+
+  &:active {
+    transform: translate(2px, 2px);
+    box-shadow:
+      0 -4px 0 -2px #000,
+      0 4px 0 -2px #000,
+      -4px 0 0 -2px #000,
+      4px 0 0 -2px #000,
+      0 -4px 0 0 #000,
+      0 4px 0 0 #000,
+      -4px 0 0 0 #000,
+      4px 0 0 0 #000,
+      inset 0 4px 0 0 rgba(0, 0, 0, 0.3);
+  }
+
+  &:hover {
+    @apply brightness-110;
+  }
+}
+
+@utility pixel-slider {
+  @apply appearance-none bg-primary/10 h-4 pixel-box cursor-pointer outline-none;
+
+  &::-webkit-slider-thumb {
+    @apply appearance-none w-6 h-6 bg-sky border-2 border-primary;
+    box-shadow: 2px 2px 0 0 rgba(0, 0, 0, 0.2);
+  }
+}
+
+@utility pixel-error {
+  @apply bg-peach/10 border-4 border-peach text-peach font-pixel p-4 relative m-2;
+  box-shadow:
+    0 -4px 0 -2px var(--panel-border),
+    0 4px 0 -2px var(--panel-border),
+    -4px 0 0 -2px var(--panel-border),
+    4px 0 0 -2px var(--panel-border),
+    4px 4px 0 0 var(--shadow-color);
+}
+
+/* Typography Helpers (Non-utility) */
+.font-pixel {
+  font-family: var(--applied-font-pixel);
+}
+.font-game {
+  font-family: var(--applied-font-game);
+}
+.font-body {
+  font-family: var(--applied-font-body);
+}
