@@ -90,7 +90,7 @@ Ensure your frontend `src/config.js` points to the correct API base URL.
 ---
 
 ## 👤 Credits
-Developed by **Jo Di Jonatan**.
+Developed by **Jodi Jonatan**.
 
 > [!NOTE]
 > This project was developed under a strictly timed competition environment, focusing on clean code, scalability, and exceptional user experience.
