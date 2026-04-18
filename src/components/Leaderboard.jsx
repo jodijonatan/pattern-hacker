@@ -115,7 +115,7 @@ export function Leaderboard({ onClose, difficulty: initialDifficulty }) {
                     {Number(entry.score).toLocaleString()}
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 bg-green shadow-[1px_1px_0_0_rgba(0,0,0,0.1)]"></span>
+                    <span className="w-2 h-2 bg-green shadow-[1px_1px_0_0_var(--shadow-color)]"></span>
                     <span className="font-pixel text-xs uppercase text-green font-bold">
                       LV.{entry.difficulty}
                     </span>

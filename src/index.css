@@ -14,6 +14,9 @@
   --color-secondary: var(--text-secondary);
   --color-bg-primary: var(--bg-primary);
   --color-bg-secondary: var(--bg-secondary);
+  --color-panel-bg: var(--panel-bg);
+  --color-panel-border: var(--panel-border);
+  --color-shadow: var(--shadow-color);
   --color-sky: var(--sky-blue);
   --color-green: var(--soft-green);
   --color-yellow: var(--warm-yellow);
@@ -91,6 +94,10 @@
 
 /* Base Styles */
 @layer base {
+  html {
+    font-size: var(--base-font-size);
+  }
+
   body {
     font-family: var(--applied-font-body);
     background-color: transparent;
@@ -139,7 +146,7 @@
 }
 
 @utility bright-overlay {
-  @apply fixed inset-0 w-full h-full -z-10 transition-colors duration-500 bg-primary opacity-80;
+  @apply fixed inset-0 w-full h-full -z-10 transition-colors duration-500 bg-bg-primary opacity-80;
 }
 
 @utility bright-panel {

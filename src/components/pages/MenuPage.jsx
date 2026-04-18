@@ -19,7 +19,7 @@ export function MenuPage() {
       
       <div className="text-center max-w-md space-y-12 animate-screen-in">
         <div className="animate-float">
-          <h1 className="font-game text-4xl md:text-5xl lg:text-7xl bg-gradient-to-r from-sky via-green to-yellow bg-clip-text text-transparent mb-6 drop-shadow-[0_10px_10px_rgba(0,0,0,0.2)]">
+          <h1 className="font-game text-4xl md:text-5xl lg:text-7xl bg-gradient-to-r from-sky via-green to-yellow bg-clip-text text-transparent mb-6 drop-shadow-[0_10px_10px_var(--shadow-color)]">
             Pattern Hacker
           </h1>
           <p className="font-pixel text-xl md:text-2xl text-secondary uppercase tracking-[0.2em] bg-panel-bg border-4 border-primary/10 py-2 pixel-corners inline-block px-10 shadow-[4px_4px_0_0_var(--shadow-color)]">
