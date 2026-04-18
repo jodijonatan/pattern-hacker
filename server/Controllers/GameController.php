@@ -10,7 +10,7 @@ class GameController extends BaseController
     {
         $this->guard();
 
-        // FIX: resetGame() already unsets this, but we preserve the check
+        // Initialize session if not exists or game over
         if (!isset($_SESSION['game']) || ($_SESSION['game']['lives'] ?? 3) <= 0) {
             $_SESSION['game'] = [
                 'score' => 0,
@@ -28,9 +28,11 @@ class GameController extends BaseController
 
         $this->json([
             'question' => $pattern['question'],
-            'score' => $_SESSION['game']['score'],
-            'lives' => $_SESSION['game']['lives'],
-            'difficulty' => $_SESSION['game']['difficulty']
+            'state' => [
+                'score' => $_SESSION['game']['score'],
+                'lives' => $_SESSION['game']['lives'],
+                'difficulty' => $_SESSION['game']['difficulty']
+            ]
         ]);
     }
 
@@ -50,14 +52,16 @@ class GameController extends BaseController
         if ($isCorrect) {
             $_SESSION['game']['score'] += 10;
             $_SESSION['game']['streak']++;
+            // Difficulty increases every 3 correct answers
             if ($_SESSION['game']['streak'] >= 3) {
                 $_SESSION['game']['difficulty'] = min(10, $_SESSION['game']['difficulty'] + 1);
                 $_SESSION['game']['streak'] = 0;
             }
         } else {
+            $_SESSION['game']['score'] -= 5;
             $_SESSION['game']['lives']--;
             $_SESSION['game']['streak'] = 0;
-            // FIX: Difficulty can decrease on mistake to keep it balanced
+            // Difficulty decreases on mistake to keep it balanced
             if ($_SESSION['game']['difficulty'] > 1) {
                 $_SESSION['game']['difficulty']--;
             }
@@ -67,20 +71,22 @@ class GameController extends BaseController
         $_SESSION['game']['score'] = max(0, $_SESSION['game']['score']);
 
         $gameOver = $_SESSION['game']['lives'] <= 0;
-        $rankings = null;
+        $rank = null;
 
         if ($gameOver) {
-            $rankings = $this->saveGameAndGetRanks();
+            $rank = $this->saveGameAndGetRanks();
         }
 
         $this->json([
             'correct' => $isCorrect,
             'correctAnswer' => $correctAnswer,
             'gameOver' => $gameOver,
-            'score' => $_SESSION['game']['score'],
-            'lives' => $_SESSION['game']['lives'],
-            'difficulty' => $_SESSION['game']['difficulty'],
-            'rankings' => $rankings
+            'state' => [
+                'score' => $_SESSION['game']['score'],
+                'lives' => $_SESSION['game']['lives'],
+                'difficulty' => $_SESSION['game']['difficulty']
+            ],
+            'rank' => $rank
         ]);
     }
 
@@ -88,14 +94,18 @@ class GameController extends BaseController
     {
         $this->guard();
         
-        // FIX: Force game over for timer-based expiry
+        // Force game over for timer-based expiry
         $_SESSION['game']['lives'] = 0; 
-        $rankings = $this->saveGameAndGetRanks();
+        $rank = $this->saveGameAndGetRanks();
 
         $this->json([
             'message' => 'Game forced to end',
-            'score' => $_SESSION['game']['score'],
-            'rankings' => $rankings
+            'state' => [
+                'score' => $_SESSION['game']['score'],
+                'lives' => 0,
+                'difficulty' => $_SESSION['game']['difficulty']
+            ],
+            'rank' => $rank
         ]);
     }
 
@@ -109,23 +119,41 @@ class GameController extends BaseController
     private function saveGameAndGetRanks()
     {
         $userId = $_SESSION['user']['id'];
-        $score = $_SESSION['game']['score'];
-        $difficulty = $_SESSION['game']['difficulty'];
+        $score = $_SESSION['game']['score'] ?? 0;
+        $difficulty = $_SESSION['game']['difficulty'] ?? 1;
 
-        // Save score
+        // Save score if not empty (prevent saving empty 0 score games if preferred, 
+        // but typically we save all final attempts)
         $this->table('scores')->insert([
             'user_id' => $userId,
             'score' => $score,
             'difficulty' => $difficulty
         ]);
 
-        // Get top rankings
-        return $this->table('scores')
-            ->select(['users.username', 'scores.score', 'scores.difficulty'])
-            ->join('users', 'users.id', '=', 'scores.user_id')
-            ->orderBy('scores.score', 'DESC')
-            ->limit(5)
-            ->get();
+        return $this->getCurrentRanks($score, $difficulty);
+    }
+
+    /**
+     * Calculates the real-time rank of the current score
+     */
+    private function getCurrentRanks($score, $difficulty)
+    {
+        // Global Rank: count distinct scores higher than this one
+        $globalRankQuery = Database::query(
+            "SELECT COUNT(DISTINCT score) + 1 as rank FROM scores WHERE score > ?", 
+            [$score]
+        )->fetch();
+
+        // Difficulty Rank: count distinct scores higher than this one in the same level
+        $difficultyRankQuery = Database::query(
+            "SELECT COUNT(DISTINCT score) + 1 as rank FROM scores WHERE score > ? AND difficulty = ?", 
+            [$score, $difficulty]
+        )->fetch();
+
+        return [
+            'global' => (int)($globalRankQuery['rank'] ?? 1),
+            'difficulty' => (int)($difficultyRankQuery['rank'] ?? 1)
+        ];
     }
 
     private function generatePattern($level)
@@ -143,33 +171,33 @@ class GameController extends BaseController
         switch ($type) {
             case 'linear':
                 for ($i = 0; $i < $length; $i++) $sequence[] = $start + ($i * $diff);
+                $answer = $start + ($length * $diff);
                 break;
             case 'multi':
-                $diff = rand(2, 3); // FIX: Keep multipliers low to avoid overflow
+                $diff = rand(2, 3);
                 for ($i = 0; $i < $length; $i++) $sequence[] = $start * pow($diff, $i);
+                $answer = $start * pow($diff, $length);
                 break;
             case 'fib':
                 $sequence = [$start, $start + $diff];
                 for ($i = 2; $i < $length; $i++) $sequence[] = $sequence[$i - 1] + $sequence[$i - 2];
+                $answer = $sequence[$length - 1] + $sequence[$length - 2];
                 break;
             case 'gap':
-                // Linear with increasing gap
-                $gap = 1;
+                $gapSize = 1;
                 $current = $start;
+                $gapIncrement = floor($level / 3);
                 for ($i = 0; $i < $length; $i++) {
                     $sequence[] = $current;
-                    $current += ($diff + $gap);
-                    $gap += floor($level / 3); // FIX: Scaling gap difficulty
+                    $current += ($diff + $gapSize);
+                    $gapSize += $gapIncrement;
                 }
+                $answer = $current;
                 break;
         }
 
-        $answerIndex = array_rand($sequence);
-        $answer = $sequence[$answerIndex];
-        $sequence[$answerIndex] = '?';
-
         return [
-            'question' => implode(', ', $sequence),
+            'question' => $sequence,
             'answer' => $answer
         ];
     }

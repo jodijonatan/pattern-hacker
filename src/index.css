@@ -247,3 +247,35 @@
 .font-body {
   font-family: var(--applied-font-body);
 }
+
+/* Custom Pixel Scrollbars */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border: 2px solid var(--panel-border);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--sky-blue);
+  border: 2px solid var(--panel-border);
+  box-shadow: inset -4px -4px 0 0 rgba(0, 0, 0, 0.4);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--lavender);
+}
+
+::-webkit-scrollbar-corner {
+  background: var(--bg-secondary);
+}
+
+/* Firefox Support */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--sky-blue) var(--bg-secondary);
+}
+

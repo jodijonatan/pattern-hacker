@@ -60,6 +60,7 @@ class Database
             private $wheres = [];
             private $bindings = [];
             private $orderBy = null;
+            private $groupBy = null;
             private $limitVal = null;
             private $selects = '*';
 
@@ -123,6 +124,12 @@ class Database
                 return $this;
             }
 
+            public function groupBy($column)
+            {
+                $this->groupBy = $this->sanitizeIdentifier($column);
+                return $this;
+            }
+
             public function orderBy($column, $direction = 'ASC')
             {
                 $column = $this->sanitizeIdentifier($column);
@@ -176,6 +183,7 @@ class Database
             private function buildSuffix()
             {
                 $sql = '';
+                if ($this->groupBy) $sql .= " GROUP BY {$this->groupBy}";
                 if ($this->orderBy) $sql .= " ORDER BY {$this->orderBy}";
                 if ($this->limitVal) $sql .= " LIMIT {$this->limitVal}";
                 return $sql;

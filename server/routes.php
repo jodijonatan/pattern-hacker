@@ -12,8 +12,7 @@ return [
     "POST /submit-answer"     => "GameController@submitAnswer",
     "POST /end-game"          => "GameController@endGame",
     "POST /reset-game"        => "GameController@resetGame",
-    "GET /get-score"          => "GameController@getScore",
 
     // Leaderboard
-    "GET /leaderboard" => "LeaderboardController@getLeaderboard",
+    "GET /leaderboard" => "LeaderboardController@index",
 ];
