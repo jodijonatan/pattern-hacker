@@ -4,314 +4,173 @@ namespace LKSCore\Controllers;
 
 use LKSCore\Core\Database;
 
-class GameController
+class GameController extends BaseController
 {
-    private $db;
-
-    public function __construct()
-    {
-        $this->db = Database::getInstance();
-    }
-
-    private function table($tableName)
-    {
-        return \LKSCore\Core\Database::table($tableName);
-    }
-
-    // =========================
-    // GENERATE QUESTION (MODUL A + B)
-    // =========================
     public function generateQuestion()
     {
         $this->guard();
 
-        // RESET SESSION IF NEW GAME OR GAME OVER
+        // FIX: resetGame() already unsets this, but we preserve the check
         if (!isset($_SESSION['game']) || ($_SESSION['game']['lives'] ?? 3) <= 0) {
             $_SESSION['game'] = [
-                "score" => 0,
-                "lives" => 3,
-                "difficulty" => 1,
-                "correct" => 0,
-                "wrong" => 0
+                'score' => 0,
+                'lives' => 3,
+                'difficulty' => 1,
+                'streak' => 0,
+                'start_time' => time()
             ];
         }
 
-        $difficulty = $_SESSION['game']['difficulty'] ?? 1;
+        $difficulty = $_SESSION['game']['difficulty'];
+        $pattern = $this->generatePattern($difficulty);
 
-        $q = $this->generatePattern($difficulty);
+        $_SESSION['game']['answer'] = $pattern['answer'];
 
-        $_SESSION['answer'] = $q['answer'];
-        unset($q['answer']);
-
-        return $this->json([
-            "question" => $q['sequence'],
-            "type" => $q['type'],
-            "difficulty" => $difficulty,
-            "state" => $_SESSION['game']
+        $this->json([
+            'question' => $pattern['question'],
+            'score' => $_SESSION['game']['score'],
+            'lives' => $_SESSION['game']['lives'],
+            'difficulty' => $_SESSION['game']['difficulty']
         ]);
     }
 
-    // =========================
-    // SUBMIT ANSWER (ADAPTIVE CORE)
-    // =========================
     public function submitAnswer()
     {
         $this->guard();
 
-        $input = json_decode(file_get_contents("php://input"), true);
+        $answer = $_POST['answer'] ?? null;
+        $correctAnswer = $_SESSION['game']['answer'] ?? null;
 
-        if (!isset($input['answer']) || !is_numeric($input['answer'])) {
-            return $this->json(["error" => "Invalid input"], 400);
+        if ($answer === null) {
+            $this->json(['message' => 'Answer required'], 400);
         }
 
-        if (!isset($_SESSION['game'])) {
-            $_SESSION['game'] = [
-                "score" => 0,
-                "lives" => 3,
-                "difficulty" => 1,
-                "correct" => 0,
-                "wrong" => 0
-            ];
-        }
+        $isCorrect = (string)$answer === (string)$correctAnswer;
 
-        $game =& $_SESSION['game'];
-        $correct = ((int)$input['answer'] === $_SESSION['answer']);
-
-        if ($correct) {
-            $game['score'] += 10;
-            $game['correct']++;
-            $game['wrong'] = 0;
+        if ($isCorrect) {
+            $_SESSION['game']['score'] += 10;
+            $_SESSION['game']['streak']++;
+            if ($_SESSION['game']['streak'] >= 3) {
+                $_SESSION['game']['difficulty'] = min(10, $_SESSION['game']['difficulty'] + 1);
+                $_SESSION['game']['streak'] = 0;
+            }
         } else {
-            // FIX: Clamp score to minimum 0 — prevents negative leaderboard entries
-            $game['score'] = max(0, $game['score'] - 5);
-            $game['lives']--;
-            $game['wrong']++;
-            $game['correct'] = 0;
+            $_SESSION['game']['lives']--;
+            $_SESSION['game']['streak'] = 0;
+            // FIX: Difficulty can decrease on mistake to keep it balanced
+            if ($_SESSION['game']['difficulty'] > 1) {
+                $_SESSION['game']['difficulty']--;
+            }
         }
 
-        // ADAPTIVE DIFFICULTY RULE
-        if ($game['correct'] >= 3) {
-            $game['difficulty']++;
-            $game['correct'] = 0;
-        }
+        // Clamp score to >= 0
+        $_SESSION['game']['score'] = max(0, $_SESSION['game']['score']);
 
-        if ($game['wrong'] >= 2 && $game['difficulty'] > 1) {
-            $game['difficulty']--;
-            $game['wrong'] = 0;
-        }
+        $gameOver = $_SESSION['game']['lives'] <= 0;
+        $rankings = null;
 
-        $gameOver = $game['lives'] <= 0;
-
-        $rank = null;
-
-        // Save to DB if game is over
         if ($gameOver) {
-            $rank = $this->saveGameAndGetRanks();
+            $rankings = $this->saveGameAndGetRanks();
         }
 
-        return $this->json([
-            "correct" => $correct,
-            "state" => $game,
-            "gameOver" => $gameOver,
-            "rank" => $rank
+        $this->json([
+            'correct' => $isCorrect,
+            'correctAnswer' => $correctAnswer,
+            'gameOver' => $gameOver,
+            'score' => $_SESSION['game']['score'],
+            'lives' => $_SESSION['game']['lives'],
+            'difficulty' => $_SESSION['game']['difficulty'],
+            'rankings' => $rankings
         ]);
     }
 
-    // =========================
-    // END GAME (for timer-based game over)
-    // FIX: Timer expiry now saves the score
-    // =========================
     public function endGame()
     {
         $this->guard();
+        
+        // FIX: Force game over for timer-based expiry
+        $_SESSION['game']['lives'] = 0; 
+        $rankings = $this->saveGameAndGetRanks();
 
-        if (!isset($_SESSION['game'])) {
-            return $this->json(["error" => "No active game session"], 400);
-        }
-
-        $game =& $_SESSION['game'];
-
-        // Only end if game is actually still active
-        if ($game['lives'] <= 0) {
-            return $this->json(["error" => "Game already over"], 400);
-        }
-
-        // Force end the game
-        $game['lives'] = 0;
-
-        $rank = $this->saveGameAndGetRanks();
-
-        return $this->json([
-            "state" => $game,
-            "gameOver" => true,
-            "rank" => $rank
+        $this->json([
+            'message' => 'Game forced to end',
+            'score' => $_SESSION['game']['score'],
+            'rankings' => $rankings
         ]);
     }
 
-    // =========================
-    // RESET GAME (force-clear session)
-    // FIX: Prevents stale state when restarting mid-game
-    // =========================
     public function resetGame()
     {
         $this->guard();
-
-        $_SESSION['game'] = [
-            "score" => 0,
-            "lives" => 3,
-            "difficulty" => 1,
-            "correct" => 0,
-            "wrong" => 0
-        ];
-        unset($_SESSION['answer']);
-
-        return $this->json([
-            "message" => "Game reset",
-            "state" => $_SESSION['game']
-        ]);
+        unset($_SESSION['game']);
+        $this->json(['message' => 'Game state reset']);
     }
 
-    // =========================
-    // SCORE ENDPOINT
-    // =========================
-    public function getScore()
-    {
-        $this->guard();
-
-        return $this->json([
-            "score" => $_SESSION['game']['score'] ?? 0
-        ]);
-    }
-
-    // =========================
-    // SHARED: Save game + calculate ranks
-    // =========================
     private function saveGameAndGetRanks()
     {
-        $userId    = $_SESSION['user']['id'];
-        $game      = $_SESSION['game'];
-        $finalScore = max(0, $game['score']); // Extra safety clamp
-        $finalDiff  = $game['difficulty'];
+        $userId = $_SESSION['user']['id'];
+        $score = $_SESSION['game']['score'];
+        $difficulty = $_SESSION['game']['difficulty'];
 
-        // 1. Insert game record
+        // Save score
         $this->table('scores')->insert([
             'user_id' => $userId,
-            'score' => $finalScore,
-            'difficulty' => $finalDiff
+            'score' => $score,
+            'difficulty' => $difficulty
         ]);
 
-        // 2. ATOMIC UPDATE: Prevent race conditions
-        \LKSCore\Core\Database::query(
-            "UPDATE `users` SET `total_score` = `total_score` + ? WHERE `id` = ?",
-            [$finalScore, $userId]
-        );
-
-        // 3. Calculate Ranks
-        $diffRankStmt = \LKSCore\Core\Database::query(
-            "SELECT COUNT(*) + 1 as `rank` FROM `scores` WHERE `difficulty` = ? AND `score` > ?",
-            [$finalDiff, $finalScore]
-        );
-        $difficultyRank = $diffRankStmt->fetch()['rank'];
-
-        $globalRankStmt = \LKSCore\Core\Database::query(
-            "SELECT COUNT(*) + 1 as `rank` FROM `scores` WHERE `score` > ?",
-            [$finalScore]
-        );
-        $globalRank = $globalRankStmt->fetch()['rank'];
-
-        return [
-            "difficulty" => $difficultyRank,
-            "global" => $globalRank
-        ];
+        // Get top rankings
+        return $this->table('scores')
+            ->select(['users.username', 'scores.score', 'scores.difficulty'])
+            ->join('users', 'users.id', '=', 'scores.user_id')
+            ->orderBy('scores.score', 'DESC')
+            ->limit(5)
+            ->get();
     }
 
-    // =========================
-    // PATTERN GENERATOR (FIXED)
-    // =========================
-    private function generatePattern($difficulty)
+    private function generatePattern($level)
     {
-        // FIX: Cleaner random selection
-        $types = ["arithmetic", "gap", "multi"];
+        $types = ['linear', 'multi', 'fib', 'gap'];
         $type = $types[array_rand($types)];
 
-        if ($type === "arithmetic") {
-            $start = rand(1, 10);
-            $step = rand(1, 5 + $difficulty);
+        $length = 4 + floor($level / 2);
+        $start = rand(1, 10 + $level);
+        $diff = rand(2, 5 + $level);
 
-            $seq = [];
-            for ($i = 0; $i < 4; $i++) {
-                $seq[] = $start + ($i * $step);
-            }
+        $sequence = [];
+        $answer = 0;
 
-            return [
-                "sequence" => $seq,
-                "answer" => $start + 4 * $step,
-                "type" => $type
-            ];
+        switch ($type) {
+            case 'linear':
+                for ($i = 0; $i < $length; $i++) $sequence[] = $start + ($i * $diff);
+                break;
+            case 'multi':
+                $diff = rand(2, 3); // FIX: Keep multipliers low to avoid overflow
+                for ($i = 0; $i < $length; $i++) $sequence[] = $start * pow($diff, $i);
+                break;
+            case 'fib':
+                $sequence = [$start, $start + $diff];
+                for ($i = 2; $i < $length; $i++) $sequence[] = $sequence[$i - 1] + $sequence[$i - 2];
+                break;
+            case 'gap':
+                // Linear with increasing gap
+                $gap = 1;
+                $current = $start;
+                for ($i = 0; $i < $length; $i++) {
+                    $sequence[] = $current;
+                    $current += ($diff + $gap);
+                    $gap += floor($level / 3); // FIX: Scaling gap difficulty
+                }
+                break;
         }
 
-        if ($type === "gap") {
-            $cur = rand(1, 10);
-            // FIX: Difficulty now scales the gap pattern
-            $gap = rand(1, 3 + intval($difficulty / 2));
-
-            $seq = [$cur];
-
-            for ($i = 0; $i < 3; $i++) {
-                $cur += $gap;
-                $seq[] = $cur;
-                $gap++;
-            }
-
-            return [
-                "sequence" => $seq,
-                "answer" => $cur + $gap,
-                "type" => $type
-            ];
-        }
-
-        // multiplication
-        $start = rand(1, 5);
-        // FIX: Cap factor to prevent absurdly large numbers at high difficulty
-        $factor = rand(2, min(2 + $difficulty, 5));
-
-        $seq = [];
-        for ($i = 0; $i < 4; $i++) {
-            $seq[] = $start * pow($factor, $i);
-        }
+        $answerIndex = array_rand($sequence);
+        $answer = $sequence[$answerIndex];
+        $sequence[$answerIndex] = '?';
 
         return [
-            "sequence" => $seq,
-            "answer" => $start * pow($factor, 4),
-            "type" => $type
+            'question' => implode(', ', $sequence),
+            'answer' => $answer
         ];
-    }
-
-    // =========================
-    // SECURITY GUARD
-    // =========================
-    private function guard()
-    {
-        if (!isset($_SESSION['user'])) {
-            $this->json(["error" => "Unauthorized"], 401);
-        }
-    }
-
-    private function json($payload, $code = 200)
-    {
-        http_response_code($code);
-        header("Content-Type: application/json");
-        
-        $response = [
-            "success" => $code < 400,
-            "data" => $code < 400 ? $payload : null
-        ];
-
-        if ($code >= 400) {
-            $response["message"] = is_array($payload) ? ($payload["error"] ?? "Error") : $payload;
-        }
-        
-        echo json_encode($response);
-        exit;
     }
 }
