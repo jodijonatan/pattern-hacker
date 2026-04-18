@@ -25,7 +25,7 @@ class GameController
     {
         $this->guard();
 
-        // 🚀 RESET SESSION IF NEW GAME OR GAME OVER (Fix for B113)
+        // RESET SESSION IF NEW GAME OR GAME OVER
         if (!isset($_SESSION['game']) || ($_SESSION['game']['lives'] ?? 3) <= 0) {
             $_SESSION['game'] = [
                 "score" => 0,
@@ -46,7 +46,8 @@ class GameController
         return $this->json([
             "question" => $q['sequence'],
             "type" => $q['type'],
-            "difficulty" => $difficulty
+            "difficulty" => $difficulty,
+            "state" => $_SESSION['game']
         ]);
     }
 
@@ -81,13 +82,14 @@ class GameController
             $game['correct']++;
             $game['wrong'] = 0;
         } else {
-            $game['score'] -= 5;
+            // FIX: Clamp score to minimum 0 — prevents negative leaderboard entries
+            $game['score'] = max(0, $game['score'] - 5);
             $game['lives']--;
             $game['wrong']++;
             $game['correct'] = 0;
         }
 
-        // 🔥 ADAPTIVE RULE (WAJIB LKS)
+        // ADAPTIVE DIFFICULTY RULE
         if ($game['correct'] >= 3) {
             $game['difficulty']++;
             $game['correct'] = 0;
@@ -102,42 +104,9 @@ class GameController
 
         $rank = null;
 
-        // simpan ke DB jika selesai
+        // Save to DB if game is over
         if ($gameOver) {
-            $userId = $_SESSION['user']['id'];
-            $finalScore = $game['score'];
-            $finalDiff  = $game['difficulty'];
-            
-            // 1. Insert game record
-            $this->table('scores')->insert([
-                'user_id' => $userId,
-                'score' => $finalScore,
-                'difficulty' => $finalDiff
-            ]);
-
-            // 2. ATOMIC UPDATE: Prevent race conditions (B112)
-            \LKSCore\Core\Database::query(
-                "UPDATE `users` SET `total_score` = `total_score` + ? WHERE `id` = ?",
-                [$finalScore, $userId]
-            );
-
-            // 3. Calculate Ranks
-            $diffRankStmt = \LKSCore\Core\Database::query(
-                "SELECT COUNT(*) + 1 as rank FROM `scores` WHERE `difficulty` = ? AND `score` > ?",
-                [$finalDiff, $finalScore]
-            );
-            $difficultyRank = $diffRankStmt->fetch()['rank'];
-
-            $globalRankStmt = \LKSCore\Core\Database::query(
-                "SELECT COUNT(*) + 1 as rank FROM `scores` WHERE `score` > ?",
-                [$finalScore]
-            );
-            $globalRank = $globalRankStmt->fetch()['rank'];
-
-            $rank = [
-                "difficulty" => $difficultyRank,
-                "global" => $globalRank
-            ];
+            $rank = $this->saveGameAndGetRanks();
         }
 
         return $this->json([
@@ -145,6 +114,60 @@ class GameController
             "state" => $game,
             "gameOver" => $gameOver,
             "rank" => $rank
+        ]);
+    }
+
+    // =========================
+    // END GAME (for timer-based game over)
+    // FIX: Timer expiry now saves the score
+    // =========================
+    public function endGame()
+    {
+        $this->guard();
+
+        if (!isset($_SESSION['game'])) {
+            return $this->json(["error" => "No active game session"], 400);
+        }
+
+        $game =& $_SESSION['game'];
+
+        // Only end if game is actually still active
+        if ($game['lives'] <= 0) {
+            return $this->json(["error" => "Game already over"], 400);
+        }
+
+        // Force end the game
+        $game['lives'] = 0;
+
+        $rank = $this->saveGameAndGetRanks();
+
+        return $this->json([
+            "state" => $game,
+            "gameOver" => true,
+            "rank" => $rank
+        ]);
+    }
+
+    // =========================
+    // RESET GAME (force-clear session)
+    // FIX: Prevents stale state when restarting mid-game
+    // =========================
+    public function resetGame()
+    {
+        $this->guard();
+
+        $_SESSION['game'] = [
+            "score" => 0,
+            "lives" => 3,
+            "difficulty" => 1,
+            "correct" => 0,
+            "wrong" => 0
+        ];
+        unset($_SESSION['answer']);
+
+        return $this->json([
+            "message" => "Game reset",
+            "state" => $_SESSION['game']
         ]);
     }
 
@@ -161,13 +184,57 @@ class GameController
     }
 
     // =========================
-    // PATTERN GENERATOR
+    // SHARED: Save game + calculate ranks
+    // =========================
+    private function saveGameAndGetRanks()
+    {
+        $userId    = $_SESSION['user']['id'];
+        $game      = $_SESSION['game'];
+        $finalScore = max(0, $game['score']); // Extra safety clamp
+        $finalDiff  = $game['difficulty'];
+
+        // 1. Insert game record
+        $this->table('scores')->insert([
+            'user_id' => $userId,
+            'score' => $finalScore,
+            'difficulty' => $finalDiff
+        ]);
+
+        // 2. ATOMIC UPDATE: Prevent race conditions
+        \LKSCore\Core\Database::query(
+            "UPDATE `users` SET `total_score` = `total_score` + ? WHERE `id` = ?",
+            [$finalScore, $userId]
+        );
+
+        // 3. Calculate Ranks
+        $diffRankStmt = \LKSCore\Core\Database::query(
+            "SELECT COUNT(*) + 1 as `rank` FROM `scores` WHERE `difficulty` = ? AND `score` > ?",
+            [$finalDiff, $finalScore]
+        );
+        $difficultyRank = $diffRankStmt->fetch()['rank'];
+
+        $globalRankStmt = \LKSCore\Core\Database::query(
+            "SELECT COUNT(*) + 1 as `rank` FROM `scores` WHERE `score` > ?",
+            [$finalScore]
+        );
+        $globalRank = $globalRankStmt->fetch()['rank'];
+
+        return [
+            "difficulty" => $difficultyRank,
+            "global" => $globalRank
+        ];
+    }
+
+    // =========================
+    // PATTERN GENERATOR (FIXED)
     // =========================
     private function generatePattern($difficulty)
     {
-        $type = ["arithmetic", "gap", "multi"][array_rand([0,1,2])];
+        // FIX: Cleaner random selection
+        $types = ["arithmetic", "gap", "multi"];
+        $type = $types[array_rand($types)];
 
-        if ($type == "arithmetic") {
+        if ($type === "arithmetic") {
             $start = rand(1, 10);
             $step = rand(1, 5 + $difficulty);
 
@@ -183,9 +250,10 @@ class GameController
             ];
         }
 
-        if ($type == "gap") {
+        if ($type === "gap") {
             $cur = rand(1, 10);
-            $gap = rand(1, 3);
+            // FIX: Difficulty now scales the gap pattern
+            $gap = rand(1, 3 + intval($difficulty / 2));
 
             $seq = [$cur];
 
@@ -204,7 +272,8 @@ class GameController
 
         // multiplication
         $start = rand(1, 5);
-        $factor = rand(2, 2 + $difficulty);
+        // FIX: Cap factor to prevent absurdly large numbers at high difficulty
+        $factor = rand(2, min(2 + $difficulty, 5));
 
         $seq = [];
         for ($i = 0; $i < 4; $i++) {

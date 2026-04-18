@@ -1,8 +1,12 @@
 import { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
 import { useSettingsStore } from "./store/useSettingsStore.js";
+import { useAuth } from "./hooks/useAuth.js";
 
-// Modular Page Components
+// Layout
+import { ProtectedRoute } from "./components/layout/ProtectedRoute";
+
+// Pages
 import { MenuPage } from "./components/pages/MenuPage";
 import { AuthPage } from "./components/pages/AuthPage";
 import { GamePage } from "./components/pages/GamePage";
@@ -11,6 +15,9 @@ import { AccessibilityTool } from "./components/ui/AccessibilityTool";
 
 export default function App() {
   const { theme, fontFamily, fontSize } = useSettingsStore();
+
+  // Initialize auth — triggers session validation on mount
+  useAuth();
 
   useEffect(() => {
     // Apply Global Styles
@@ -30,7 +37,11 @@ export default function App() {
         <Route path="/" element={<MenuPage />} />
         <Route path="/login" element={<AuthPage />} />
         <Route path="/register" element={<AuthPage />} />
-        <Route path="/game" element={<GamePage />} />
+        <Route path="/game" element={
+          <ProtectedRoute>
+            <GamePage />
+          </ProtectedRoute>
+        } />
         <Route path="/leaderboard" element={<LeaderboardPage />} />
       </Routes>
 

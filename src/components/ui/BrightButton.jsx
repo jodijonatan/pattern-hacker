@@ -1,5 +1,3 @@
-import React from 'react';
-
 export const BrightButton = ({ 
   children, 
   variant = 'blue', 
@@ -26,8 +24,10 @@ export const BrightButton = ({
     xl: 'px-12 py-5 text-base'
   };
 
+  // FIX: variant classes are now actually applied to the element
   const baseClasses = `
     bright-button transition-all duration-100 disabled:opacity-50 disabled:pointer-events-none
+    ${variants[variant] || variants.blue}
     ${sizes[size] || sizes.md}
     ${className}
   `;

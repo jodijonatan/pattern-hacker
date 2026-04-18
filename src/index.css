@@ -1,5 +1,5 @@
-@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@400;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=VT323&display=swap");
+/* FIX: Combined into single import to reduce render-blocking requests */
+@import url("https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@400;700&family=VT323&display=swap");
 
 @import "tailwindcss";
 
@@ -59,7 +59,7 @@
   --bg-primary: #f0f0f0;
   --bg-secondary: #e0e0e0;
   --text-primary: #101010;
-  --text-secondary: #404040;
+  --text-secondary: #818181;
   --panel-bg: #ffffff;
   --panel-border: #000000;
   --shadow-color: rgba(0, 0, 0, 0.3);
@@ -96,7 +96,7 @@
     background-color: transparent;
     color: var(--text-primary);
     @apply antialiased overflow-x-hidden transition-all duration-300;
-    image-rendering: pixelated;
+    /* FIX: Removed image-rendering: pixelated from body — only pixel-art elements need it */
   }
 
   body::after {
@@ -225,6 +225,16 @@
     -4px 0 0 -2px var(--panel-border),
     4px 0 0 -2px var(--panel-border),
     4px 4px 0 0 var(--shadow-color);
+}
+
+/* FIX: pixel-corners was referenced in components but never defined */
+@utility pixel-corners {
+  clip-path: polygon(
+    0 4px, 4px 4px, 4px 0,
+    calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px,
+    100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%,
+    4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px)
+  );
 }
 
 /* Typography Helpers (Non-utility) */

@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGame } from "../../hooks/useGame.js";
-import { useAuth } from "../../hooks/useAuth.js";
+import { useAuthStore } from "../../store/useAuthStore.js";
 import { BrightButton } from "../ui/BrightButton";
 import { BrightInput } from "../ui/BrightInput";
 import { BrightHUD } from "../ui/BrightHUD";
@@ -12,27 +12,27 @@ export function GamePage() {
   const [input, setInput] = useState("");
   const [feedback, setFeedback] = useState(null);
   const [isError, setIsError] = useState(false);
-  const auth = useAuth();
-  
+  const feedbackTimeoutRef = useRef(null); // FIX: prevent stacked timeouts
+
+  // Read user directly from store (ProtectedRoute already guards this page)
+  const user = useAuthStore((s) => s.user);
+
   // Custom hook usage
-  const game = useGame({ 
-    user: auth.user,
+  const game = useGame({
+    user,
     onGameOver: (finalScore) => {
       console.log("Game Over! Score:", finalScore);
     }
   });
-  
-  const { state, question, timer, rank, submitAnswer, resetGame, loading, error } = game;
+
+  const { state, question, timer, rank, gameOver, submitAnswer, resetGame, loading, error } = game;
   const sequence = question?.sequence || [];
   const lives = state?.lives ?? 3;
   const score = state?.score ?? 0;
   const difficulty = state?.difficulty || 1;
 
-  useEffect(() => {
-    if (!auth.user && !auth.loading) {
-      navigate("/login");
-    }
-  }, [auth.user, auth.loading, navigate]);
+  // NOTE: Auth redirect is now handled by ProtectedRoute in App.jsx
+  // No useEffect for auth redirect needed here
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,28 +43,30 @@ export function GamePage() {
 
     const value = Number(valStr);
     if (Number.isNaN(value)) {
-      setFeedback("Numbers only, please! ✍️");
-      setIsError(true);
+      showFeedback("Numbers only, please! ✍️", true);
       return;
     }
 
     const isCorrect = await submitAnswer(value);
-    
+
     if (isCorrect) {
-      setFeedback("✨ Brilliant! +10 Points");
-      setIsError(false);
+      showFeedback("✨ Brilliant! +10 Points", false);
     } else {
-      setFeedback("💭 Not quite... Keep trying!");
-      setIsError(true);
+      showFeedback("💭 Not quite... Keep trying!", true);
     }
 
     setInput("");
-    
-    // Clear feedback after 2 seconds
-    setTimeout(() => setFeedback(null), 2000);
   };
 
-  if (!auth.user) return null;
+  // FIX: Properly managed feedback with timeout cleanup
+  const showFeedback = (message, error) => {
+    clearTimeout(feedbackTimeoutRef.current);
+    setFeedback(message);
+    setIsError(error);
+    feedbackTimeoutRef.current = setTimeout(() => setFeedback(null), 2000);
+  };
+
+  if (!user) return null;
 
   return (
     <div className="min-h-dvh w-full overflow-x-hidden">
@@ -76,7 +78,7 @@ export function GamePage() {
         {/* Superior HUD */}
         <div className="w-full mb-8">
           <BrightHUD 
-            username={auth.user.username}
+            username={user.username}
             difficulty={difficulty}
             score={score}
             lives={lives}
@@ -86,14 +88,14 @@ export function GamePage() {
           />
         </div>
 
-        {lives <= 0 || timer <= 0 ? (
+        {gameOver || lives <= 0 || timer <= 0 ? (
           /* Game Over State */
           <div className="w-full max-w-lg mx-auto py-12">
             <BrightPanel title="Adventure Complete! 🌟" className="text-center shadow-2xl border-2 border-yellow/30">
               <div className="space-y-10 py-6">
                 <div>
-                  <p className="font-pixel text-ui-border/60 uppercase tracking-widest mb-2">Final Score</p>
-                  <div className="font-game text-6xl md:text-7xl text-warm-yellow drop-shadow-lg">
+                  <p className="font-pixel text-secondary/60 uppercase tracking-widest mb-2">Final Score</p>
+                  <div className="font-game text-6xl md:text-7xl text-yellow drop-shadow-lg">
                     {score}
                   </div>
                 </div>
@@ -127,7 +129,7 @@ export function GamePage() {
             
             {/* The Pattern Display */}
             <BrightPanel className="relative overflow-visible">
-              <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-sky text-white px-8 py-2 pixel-corners font-game text-[10px] shadow-lg z-30 uppercase tracking-widest border-4 border-primary/10">
+              <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-sky text-white px-8 py-2 font-game text-[10px] shadow-lg z-30 uppercase tracking-widest border-4 border-primary/10">
                 Sequence Challenge
               </div>
               
@@ -158,33 +160,33 @@ export function GamePage() {
 
             {/* Answer Region */}
             <div className="max-w-md mx-auto w-full">
-  <form onSubmit={handleSubmit} className="space-y-6">
-    <div className="relative group">
-      <div className="absolute -inset-1 bg-gradient-to-r from-sky-blue via-soft-green to-warm-yellow rounded-[20px] blur opacity-30 group-focus-within:opacity-100 transition duration-1000 group-focus-within:duration-200"></div>
-      
-      <BrightInput
-        type="number"
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        placeholder="Enter missing number..."
-        size="xl"
-        className="w-full relative shadow-inner"
-        autoFocus
-        disabled={loading}
-      />
-    </div>
-    
-    <BrightButton
-      type="submit"
-      disabled={loading || !input}
-      variant="blue"
-      size="xl"
-      className="w-full shadow-2xl hover:shadow-sky-blue/40"
-    >
-      {loading ? "Verifying..." : "Confirm Answer ✨"}
-    </BrightButton>
-  </form>
-</div>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="relative group">
+                  <div className="absolute -inset-1 bg-gradient-to-r from-sky via-green to-yellow rounded-[20px] blur opacity-30 group-focus-within:opacity-100 transition duration-1000 group-focus-within:duration-200"></div>
+                  
+                  <BrightInput
+                    type="number"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    placeholder="Enter missing number..."
+                    size="xl"
+                    className="w-full relative shadow-inner"
+                    autoFocus
+                    disabled={loading}
+                  />
+                </div>
+                
+                <BrightButton
+                  type="submit"
+                  disabled={loading || !input}
+                  variant="blue"
+                  size="xl"
+                  className="w-full shadow-2xl"
+                >
+                  {loading ? "Verifying..." : "Confirm Answer ✨"}
+                </BrightButton>
+              </form>
+            </div>
           </div>
         )}
 
