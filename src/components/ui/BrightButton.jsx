@@ -26,7 +26,7 @@ export const BrightButton = ({
 
   // FIX: variant classes are now actually applied to the element
   const baseClasses = `
-    bright-button transition-all duration-100 disabled:opacity-50 disabled:pointer-events-none
+    bright-button pixel-corners transition-all duration-100 disabled:opacity-50 disabled:pointer-events-none
     ${variants[variant] || variants.blue}
     ${sizes[size] || sizes.md}
     ${className}

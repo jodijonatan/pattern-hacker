@@ -34,7 +34,7 @@ export function MenuPage() {
                 variant="green" 
                 size="xl" 
                 onClick={() => navigate("/game")} 
-                className="w-full max-w-sm mx-auto shadow-xl"
+                className="w-full max-w-sm mx-auto shadow-2xl"
               >
                 🎮 Start Game
               </BrightButton>
@@ -42,7 +42,7 @@ export function MenuPage() {
                 variant="lavender" 
                 size="lg" 
                 onClick={() => navigate("/leaderboard")} 
-                className="w-full max-w-sm mx-auto"
+                className="w-full max-w-sm mx-auto shadow-xl"
               >
                 🏆 Leaderboard
               </BrightButton>
