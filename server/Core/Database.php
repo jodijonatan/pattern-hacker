@@ -74,8 +74,8 @@ class Database
 
             private function sanitizeIdentifier($id)
             {
-                // Only allow alphanumeric, underscore, and dot (for table.column)
-                return preg_replace('/[^a-zA-Z0-9_\.]/', '', $id);
+                // Allow alphanumeric, underscore, dot, parentheses, and spaces for aggregations/aliases
+                return preg_replace('/[^a-zA-Z0-9_\.\(\)\s]/', '', $id);
             }
 
             private function validateOperator($operator)

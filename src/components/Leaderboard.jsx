@@ -64,7 +64,7 @@ export function Leaderboard({ onClose, difficulty: initialDifficulty }) {
       </div>
 
       {/* Difficulty Filter */}
-      <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide">
+      <div className="flex gap-2 overflow-x-auto pt-2 pb-4 scrollbar-hide">
         {filterOptions.map((opt) => (
           <button
             key={opt.label}
