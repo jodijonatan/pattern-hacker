@@ -7,7 +7,8 @@ export function AccessibilityTool() {
   const { 
     theme, toggleTheme, 
     fontSize, setFontSize, 
-    fontFamily, setFontFamily 
+    fontFamily, setFontFamily,
+    soundEnabled, toggleSound
   } = useSettingsStore();
 
   const fonts = [
@@ -41,26 +42,34 @@ export function AccessibilityTool() {
           </button>
         </div>
 
-        {/* Theme Toggle */}
-        <div className="space-y-3">
-          <label className="font-pixel text-xs uppercase tracking-widest opacity-60">Visual Theme</label>
-          <div className="grid grid-cols-2 gap-3">
-            <BrightButton 
-              variant={theme === 'light' ? 'sky' : 'white'} 
-              size="sm" 
-              onClick={() => toggleTheme()}
-              className="w-full"
-            >
-              ☀️ Light
-            </BrightButton>
-            <BrightButton 
-              variant={theme === 'dark' ? 'lavender' : 'white'} 
-              size="sm" 
-              onClick={() => toggleTheme()}
-              className="w-full"
-            >
-              🌙 Dark
-            </BrightButton>
+        {/* Theme & Sound Toggles */}
+        <div className="grid grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <label className="font-pixel text-xs uppercase tracking-widest opacity-60">Theme</label>
+            <div className="grid grid-cols-1 gap-2">
+              <BrightButton 
+                variant={theme === 'light' ? 'sky' : 'white'} 
+                size="sm" 
+                onClick={() => toggleTheme()}
+                className="w-full text-[10px]"
+              >
+                {theme === 'light' ? '☀️ Light' : '🌙 Dark'}
+              </BrightButton>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label className="font-pixel text-xs uppercase tracking-widest opacity-60">Audio FX</label>
+            <div className="grid grid-cols-1 gap-2">
+              <BrightButton 
+                variant={soundEnabled ? 'green' : 'peach'} 
+                size="sm" 
+                onClick={() => toggleSound()}
+                className="w-full text-[10px]"
+              >
+                {soundEnabled ? '🔊 ON' : 'MUTE'}
+              </BrightButton>
+            </div>
           </div>
         </div>
 

@@ -1,7 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useGame } from "../../hooks/useGame.js";
 import { useAuthStore } from "../../store/useAuthStore.js";
+import { useSettingsStore } from "../../store/useSettingsStore.js";
 import { BrightButton } from "../ui/BrightButton";
 import { BrightInput } from "../ui/BrightInput";
 import { BrightHUD } from "../ui/BrightHUD";
@@ -26,10 +27,32 @@ export function GamePage() {
   });
 
   const { state, question, timer, rank, gameOver, submitAnswer, resetGame, loading, error } = game;
+  const { soundEnabled, setIsGameOver } = useSettingsStore();
   const sequence = question?.sequence || [];
   const lives = state?.lives ?? 3;
   const score = state?.score ?? 0;
   const difficulty = state?.difficulty || 1;
+
+  // Handle Adventure Complete Sound & Sync Global State
+  useEffect(() => {
+    setIsGameOver(gameOver);
+
+    if (gameOver && soundEnabled) {
+      const audio = new Audio("/sounds/adventure-complete.mp3");
+      audio.volume = 0.6;
+      audio.play().catch(e => console.error("Adventure complete sound failed:", e));
+    }
+
+    // Cleanup: Reset global game over state when leaving the page or resetting
+    return () => {
+      if (!gameOver) setIsGameOver(false);
+    };
+  }, [gameOver, soundEnabled, setIsGameOver]);
+
+  // Ensure game over is reset when component unmounts COMPLETELY
+  useEffect(() => {
+    return () => setIsGameOver(false);
+  }, [setIsGameOver]);
 
   // NOTE: Auth redirect is now handled by ProtectedRoute in App.jsx
   // No useEffect for auth redirect needed here
