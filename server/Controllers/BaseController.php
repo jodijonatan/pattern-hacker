@@ -9,11 +9,21 @@ abstract class BaseController
     /**
      * Helper to return JSON response
      */
-    protected function json($data, $status = 200)
+    protected function json($payload, $status = 200)
     {
         http_response_code($status);
         header('Content-Type: application/json');
-        echo json_encode($data);
+        
+        $response = [
+            "success" => $status < 400,
+            "data" => $status < 400 ? $payload : null
+        ];
+        
+        if ($status >= 400) {
+            $response["message"] = is_array($payload) ? ($payload["message"] ?? $payload["error"] ?? "Error") : $payload;
+        }
+
+        echo json_encode($response);
         exit;
     }
 

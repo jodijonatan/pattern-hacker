@@ -54,9 +54,6 @@ if (session_status() === PHP_SESSION_NONE) {
     ]);
 }
 
-// ========================================
-// 4. Database Init — from config.php constants
-// ========================================
 \LKSCore\Core\Database::init([
     'host' => DB_HOST,
     'db'   => DB_NAME,
@@ -65,7 +62,21 @@ if (session_status() === PHP_SESSION_NONE) {
 ]);
 
 // ========================================
-// 5. CSRF Token Management
+// 5. JSON Body Parser
+// ========================================
+// PHP does not automatically populate $_POST for application/json.
+// We manually parse the input stream and merge it into $_POST.
+$contentType = $_SERVER["CONTENT_TYPE"] ?? '';
+if (stripos($contentType, 'application/json') !== false) {
+    $json = file_get_contents('php://input');
+    $data = json_decode($json, true);
+    if (is_array($data)) {
+        $_POST = array_merge($_POST, $data);
+    }
+}
+
+// ========================================
+// 6. CSRF Token Management
 // ========================================
 // Generate token if none exists
 if (!isset($_SESSION['csrf_token'])) {
